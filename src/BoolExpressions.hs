@@ -49,8 +49,8 @@ notvar a = Not $ Var a
 (==>) :: Term a -> Term a -> Term a
 t1 ==> t2 =  dnf [[t1,t2],[Not t2, Not t1], [t2, Not t1]]
 
-xor :: Ord a => a -> a -> Term a
-xor t1 t2 = Or (And (Var t1) (notvar t2)) (And (notvar t1) (Var t2))
+xor :: Ord a => Term a -> Term a -> Term a
+xor t1 t2 = Or (And t1 (Not t2)) (And (Not t1) t2)
 
 mkOr :: (Ord a) => a -> a -> Term a
 mkOr a b = Or (Var a) (Var b)
