@@ -34,17 +34,23 @@ nots = L.map Not
 cnf :: [[Term a]] -> Term a
 cnf = ands . L.map ors
 
+andOfOrs :: [[Term a]] -> Term a
 andOfOrs = cnf
 
 dnf :: [[Term a]] -> Term a
 dnf = ors . L.map ands
 
+orOfAnds :: [[Term a]] -> Term a
 orOfAnds = dnf
 
+notvar :: Ord a => a -> Term a
 notvar a = Not $ Var a
 
 (==>) :: Term a -> Term a -> Term a
 t1 ==> t2 =  dnf [[t1,t2],[Not t2, Not t1], [t2, Not t1]]
+
+xor :: Term a -> Term a -> Term a
+xor t1 t2 = Or (And t1 (Not t2)) (And (Not t1) t2)
 
 exactlyOne :: [Term a] -> Term a
 exactlyOne (t:ts) =  f [] t ts -- (t1 and ~t2 and ~t3) or (~t1 and t2 and ~t3) etc.

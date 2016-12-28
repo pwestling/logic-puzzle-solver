@@ -14,19 +14,19 @@ type Assignment a = M.Map a Bool
 
 consistent :: Assignment a -> Term a -> Bool
 consistent a t = fromMaybe True (consistentHelper a t) where
-  consistentHelper a (Var n) = M.lookup n a
-  consistentHelper a (Not t) = fmap not (consistentHelper a t)
-  consistentHelper a (Or t1 t2) = Just $ consistent a t1 || consistent a t2
-  consistentHelper a (And t1 t2) = Just $ consistent a t1 && consistent a t2
+  consistentHelper an (Var n) = M.lookup n an
+  consistentHelper an (Not t1) = fmap not (consistentHelper an t1)
+  consistentHelper an (Or t1 t2) = Just $ consistent an t1 || consistent an t2
+  consistentHelper an (And t1 t2) = Just $ consistent an t1 && consistent an t2
 
-getVars :: (Eq a, Ord a) => Term a -> [a]
+getVars :: (Ord a) => Term a -> [a]
 getVars t = nub $ f t where
   f (Var s) = [s]
   f (And t1 t2) = f t1 ++ f t2
   f (Or t1 t2) = f t1 ++ f t2
-  f (Not t) = f t
+  f (Not t1) = f t1
 
-nextGuess :: (Eq a, Ord a) => Assignment a -> a -> [a] -> Term a -> Maybe (Assignment a)
+nextGuess :: (Ord a) => Assignment a -> a -> [a] -> Term a -> Maybe (Assignment a)
 nextGuess assign curr others term
   | isJust trueGuess = trueGuess
   | otherwise = falseGuess
@@ -48,7 +48,7 @@ nextSearchStep currAssign currVar nextVars term
     curVarVal = fromMaybe (error "Should only eval if there's a next term") currVar
     guess = nextGuess currAssign curVarVal nextVars term
 
-createAssignment :: (Eq a, Ord a) => Term a -> Maybe (Assignment a)
+createAssignment :: (Ord a) => Term a -> Maybe (Assignment a)
 createAssignment t = nextSearchStep M.empty (headMay vars) (tail vars) t where
   vars = getVars t
 
@@ -89,8 +89,19 @@ allPairingConstraints classes = ands $ L.map oto classPairs
 truths :: Assignment a -> Assignment a
 truths = M.filter id
 
---nLessThan :: Integer -> a -> a -> [a] -> Term (a,a)
---nLessThan n el1 el2 (c:cs) = Or (And )
+nLessThan :: (Ord a) => a -> a -> [a] -> Int -> Term (a,a)
+nLessThan a b cs n = nLessThanHelper a b cs (drop n cs) where
+  nLessThanHelper el1 el2 (v1:_) [v2] = And (Var (el1,v1)) (Var (el2,v2))
+  nLessThanHelper el1 el2 (v1:el1Vals) (v2:el2Vals) = Or (And (Var (el1,v1)) (Var (el2,v2))) (nLessThanHelper el1 el2 el1Vals el2Vals)
+
+lessThan :: Ord a => a -> a -> [a] -> Term (a, a)
+lessThan a b cs = ors $ L.map (nLessThan a b cs) [1..(length cs - 1)]
+
+pairReverse :: Ord a => Term (a,a) -> Term (a,a)
+pairReverse (Var (t1,t2)) = Var (t2,t1)
+pairReverse (And t1 t2) = And (pairReverse t1) (pairReverse t2)
+pairReverse (Or t1 t2) = Or (pairReverse t1) (pairReverse t2)
+pairReverse (Not t) = Not (pairReverse t)
 
 data Puzzle = Puzzle [[String]] [Term (String,String)]
 
