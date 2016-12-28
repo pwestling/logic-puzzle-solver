@@ -15,7 +15,7 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     BoolExpressions, BoolSolver
+  exposed-modules:     BoolExpressions, BoolSolver, LogicPuzzleSolver
   build-depends:       base >= 4.7 && < 5, containers, safe
   default-language:    Haskell2010
 
