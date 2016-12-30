@@ -66,16 +66,36 @@ getClass a cs = (fromJust $ L.find hasIt cs, L.filter (not . hasIt) cs) where
 insertAll :: (Ord a) => [a] -> b -> M.Map a b -> M.Map a b
 insertAll as b = foldl' (.) id $ (`M.insert` b) <$> as
 
-pairingConstraintsAssignment :: (Ord a) => a -> [a] -> a -> [a] -> Bool -> Assignment (Pair a)
-pairingConstraintsAssignment a1 c1 a2 c2 True = insertAll pairsToAssign False M.empty where
+pairingConstraintsAssignment :: (Ord a) => a -> [a] -> a -> [a] -> Assignment (Pair a)
+pairingConstraintsAssignment a1 c1 a2 c2 = insertAll pairsToAssign False M.empty where
   pairsToAssign = L.filter (/= pair a1 a2) (pair a1 <$> c2) ++ (pair a2 <$> c1)
-pairingConstraintsAssignment _ _ _ _ _ = M.empty
+
+
+trade :: (Ord a) => a -> a -> Pair a -> Pair a
+trade target result (Pair a b)
+  | a == target = pair result b
+  | b == target = pair a result
+  | otherwise = pair a b
+
+joinConstraintsAssignment :: (Ord a) => a -> [[a]] -> a -> [[a]] -> Assignment (Pair a) -> Assignment (Pair a)
+joinConstraintsAssignment a1 others1 a2 others2 currAssign = M.union truths falses where
+  isAssignedTrue = L.filter (fromMaybe False . (`M.lookup` currAssign))
+  isAssignedFalse = L.filter (maybe False not . (`M.lookup` currAssign))
+  pairsToAssignFor1 = map (trade a1 a2) $ isAssignedTrue $ map (pair a1) (concat others1)
+  pairsToAssignFor2 = map (trade a2 a1) $ isAssignedTrue $ map (pair a2) (concat others2)
+  pairsToDisjoinFor1 = map (trade a1 a2) $ isAssignedFalse $ map (pair a1) (concat others1)
+  pairsToDisjoinFor2 = map (trade a2 a1) $ isAssignedFalse $ map (pair a2) (concat others2)
+  truths = insertAll (pairsToAssignFor1 ++ pairsToAssignFor2) True M.empty
+  falses = insertAll (pairsToDisjoinFor1 ++ pairsToDisjoinFor2) False M.empty
 
 applyContraints :: Puzzle -> Pair ClassMember -> Bool -> Assignment (Pair ClassMember) -> Assignment (Pair ClassMember)
-applyContraints (Puzzle classes rules) pr@(Pair c1 c2) b currAssigns = M.union (M.insert pr b currAssigns) pairConstraints where
+applyContraints (Puzzle classes rules) pr@(Pair c1 c2) True currAssigns = M.union (M.insert pr True currAssigns) allConstraints where
   (class1, others1) = getClass c1 classes
   (class2, others2) = getClass c2 classes
-  pairConstraints = pairingConstraintsAssignment c1 class1 c2 class2 b
+  pairConstraints = pairingConstraintsAssignment c1 class1 c2 class2
+  joinConstraints = joinConstraintsAssignment c1 others1 c2 others2 currAssigns
+  allConstraints = M.union pairConstraints joinConstraints
+applyContraints _ pr False currAssigns = M.insert pr False currAssigns
 
 
 solve :: Puzzle -> Maybe (Assignment (Pair ClassMember))
@@ -96,9 +116,8 @@ greaterThan a b = lessThan b a
 nGreaterThan :: Ord a => a -> a -> [a] -> Int -> Term (Pair a)
 nGreaterThan a b = nLessThan b a
 
-isOneOf :: Ord a => a -> [a] -> Term (Pair a)
-isOneOf a [b] = Var (pair a b)
-isOneOf a (b:bs) = xor (Var (pair a b)) (isOneOf a bs)
+isOneOf :: Ord a => a -> a -> a -> Term (Pair a)
+isOneOf a b c = xor (Var (pair a b)) (Var (pair a c))
 
 allDisjointRule :: (Ord a) => [a] -> Term (Pair a)
 allDisjointRule [a1,a2] = notvar (pair a1 a2)
@@ -116,26 +135,28 @@ is a b = Var $ pair a b
 isNot :: (Ord a) => a -> a -> Term (Pair a)
 isNot a b = notvar $ pair a b
 
-prices = ["9.50","11.50","13.50","15.50","17.50","19.50","21.50"]
-rolls1 = ["alaskan","dragon","dynamite","eel avocado","firecracker","futomaki","hawaiian"]
-rolls2 = ["spicy tuna", "spider", "summer", "teriyaki", "tiger", "volcano", "yellowtail"]
-customers = ["eleanor","gilbert","karla","pam","ramona","seth", "william"]
-rule1 = "spider" `isOneOf` ["seth", "15.50"]
-rule2 = "17.50" `isOneOf` ["tiger", "alaskan"]
-rule3 = "ramona" `isNot` "tiger"
-rule4 = lessThan "dragon" "gilbert" prices
-rule5 = nLessThan "eleanor" "dynamite" prices 5
-rule6 = ["spicy tuna","19.50"] `matchTo` ["seth", "gilbert"]
-rule7 = ["21.50","hawaiian"] `matchTo` ["karla","spider"]
-rule8 = ["teriyaki","alaskan"] `matchTo` ["21.50","pam"]
-rule9 = greaterThan "pam" "firecracker" prices
-rule10 = "dragon" `isOneOf` ["spicy tuna","13.50"]
-rule11 = nGreaterThan "futomaki" "summer" prices 4
-rule12 = "gilbert" `isNot` "volcano"
-rule13 = ["pam","eel avocado"] `matchTo` ["13.50","summer"]
+dates = ["6","13","20","27","4", "11","18"]
+survivors = ["colin","darrell","hector","jon","pedro","steven","victor"]
+countries = ["bol","cam","kir","mya","nic","new","van"]
+tools = ["duct","fire","hatchet","knife","pot","rope","water"]
+rule1 = "knife" `isOneOf` "bol" $ "13"
+rule2 = ["20","pot"] `matchTo` ["mya","jon"]
+rule3 = greaterThan "mya" "nic" dates
+rule4 = "colin" `isOneOf` "rope" $ "4"
+rule5 = greaterThan "new" "cam" dates
+rule6 = "pedro" `is` "13"
+rule7 = allDisjointRule ["van","20","jon","water","4","pedro","18"]
+rule8 = nGreaterThan "steven" "jon" dates 3
+rule9 = greaterThan "cam" "jon" dates
+rule10 = "4" `is` "knife"
+rule11 = "fire" `isOneOf` "hector" $ "18"
+rule12 = "rope" `isOneOf` "20" $ "6"
+rule13 = "colin" `isNot` "bol"
+rule14 = ["darrell","rope"] `matchTo` ["new","20"]
+rule15 = nLessThan "hatchet" "kir" dates 3
 
-z = Puzzle [prices, rolls1, rolls2, customers]
-  [rule1, rule2, rule3, rule4, rule5, rule6, rule7, rule8, rule9, rule10, rule11, rule12, rule13]
+z = Puzzle [dates, survivors, countries, tools]
+  [rule1, rule2, rule3, rule4, rule5, rule6, rule7, rule8, rule9, rule10, rule11, rule12, rule13, rule14, rule15]
 
 showSolution :: (Show a) => Assignment a -> String
 showSolution a = L.foldl1' (++) $ L.map ((++ "\n") . show) (M.keys (truths a))
