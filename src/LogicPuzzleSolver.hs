@@ -7,9 +7,10 @@ import           BoolSolver
 import           Data.List       as L
 import qualified Data.Map        as M
 import           Data.Maybe
+import           Debug.Trace
 
 data Pair a = Pair a a deriving (Eq,Ord)
-data Puzzle = Puzzle [Class] [Term (Pair ClassMember)]
+data Puzzle = Puzzle [Class] [Term (Pair ClassMember)] deriving Show
 
 type Class = [ClassMember]
 type ClassMember = String
@@ -102,6 +103,7 @@ solve :: Puzzle -> Maybe (Assignment (Pair ClassMember))
 solve p = truths <$> createAssignment (puzzleExpression p) (applyContraints p)
 
 nLessThan :: (Ord a) => a -> a -> [a] -> Int -> Term (Pair a)
+nLessThan _ _ [] _ = error "Empty class"
 nLessThan a b cs n = nLessThanHelper a b cs (drop n cs) where
   nLessThanHelper el1 el2 (v1:_) [v2] = And (Var (pair el1 v1)) (Var (pair el2 v2))
   nLessThanHelper el1 el2 (v1:el1Vals) (v2:el2Vals) =
